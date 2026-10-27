@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Sign up{% endblock %}
+{% block content %}
+<section class="card auth-card">
+  <h1>Create an account</h1>
+  <p class="muted">You need an account to rate and review places.</p>
+  <form class="form" method="post" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Username
+      <input type="text" name="username" value="{{ username }}" autocomplete="username" autocapitalize="none" required maxlength="20">
+      <span class="hint">3–20 characters: letters, numbers or underscores.</span>
+    </label>
+    <label>Password
+      <input type="password" name="password" autocomplete="new-password" required>
+      <span class="hint">At least 8 characters.</span>
+    </label>
+    <label>Confirm password
+      <input type="password" name="confirm" autocomplete="new-password" required>
+    </label>
+    <button class="btn" type="submit">Create account</button>
+  </form>
+  <p class="small muted">Already have an account? <a href="{{ url_for('auth.login') }}">Log in</a>.</p>
+</section>
+{% endblock %}

@@ -15,7 +15,16 @@
       <nav class="nav">
         <a href="{{ url_for('index') }}">Rankings</a>
         <a href="{{ url_for('about') }}">About</a>
-        {% block nav_extra %}{% endblock %}
+        {% if g.user %}
+          <span class="nav-user">Hi, {{ g.user.username }}</span>
+          <form method="post" action="{{ url_for('auth.logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="linkish" type="submit">Log out</button>
+          </form>
+        {% else %}
+          <a href="{{ url_for('auth.login') }}">Log in</a>
+          <a class="btn" href="{{ url_for('auth.register') }}">Sign up</a>
+        {% endif %}
       </nav>
     </div>
   </header>

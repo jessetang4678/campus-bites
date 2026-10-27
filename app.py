@@ -3,6 +3,7 @@ import os
 
 from flask import Flask, abort, render_template
 
+import auth
 import db
 from db import get_db
 
@@ -12,6 +13,11 @@ app.config["DATABASE"] = os.environ.get(
     "DATABASE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "campus_bites.db")
 )
 db.init_app(app)
+
+app.register_blueprint(auth.bp)
+app.before_request(auth.load_user)
+app.before_request(auth.check_csrf)
+app.jinja_env.globals["csrf_token"] = auth.csrf_token
 
 # Average rating, number of reviews; ties go to the place with more reviews,
 # places nobody has reviewed yet come last.
