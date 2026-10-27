@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% from "_macros.html" import price %}
+{% block title %}{{ place.name }}{% endblock %}
+{% block content %}
+<section class="card">
+  <p class="small"><a href="{{ url_for('index') }}">← All places</a></p>
+  <h1>{{ place.name }}</h1>
+  <div class="rank-meta">
+    <span class="pill">{{ place.category }}</span> {{ price(place.price) }} · {{ place.location }}
+  </div>
+  {% if place.description %}<p>{{ place.description }}</p>{% endif %}
+</section>
+{% endblock %}

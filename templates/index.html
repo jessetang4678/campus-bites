@@ -1,9 +1,37 @@
 {% extends "base.html" %}
+{% from "_macros.html" import stars, price %}
 {% block title %}Rankings{% endblock %}
 {% block content %}
 <section class="hero">
   <h1>Where should we eat?</h1>
   <p class="lede">Ratings and reviews of every place to eat on and around campus, ranked by the students who eat there.</p>
 </section>
-<p class="muted">No places yet.</p>
+
+{% if places %}
+<ol class="ranking">
+  {% for p in places %}
+  <li class="card rank-item">
+    <div class="rank-num">{% if p.n_reviews %}{{ loop.index }}{% else %}–{% endif %}</div>
+    <div>
+      <h3><a href="{{ url_for('place', place_id=p.id) }}">{{ p.name }}</a></h3>
+      <div class="rank-meta">
+        <span class="pill">{{ p.category }}</span>
+        {{ price(p.price) }} · {{ p.location }}
+      </div>
+    </div>
+    <div class="rank-score">
+      {% if p.n_reviews %}
+        <div class="score-big">{{ '%.1f' % p.avg_rating }}</div>
+        {{ stars(p.avg_rating) }}
+        <div class="small muted">{{ p.n_reviews }} review{{ '' if p.n_reviews == 1 else 's' }}</div>
+      {% else %}
+        <span class="pill pill-quiet">No reviews yet</span>
+      {% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ol>
+{% else %}
+<div class="card empty">No places to show yet.</div>
+{% endif %}
 {% endblock %}
