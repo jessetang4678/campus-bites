@@ -1,0 +1,11 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.db
+.pytest_cache/
+tests/
+.env
+.secret_key
