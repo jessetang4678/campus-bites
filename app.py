@@ -5,6 +5,7 @@ from flask import Flask, abort, flash, g, redirect, render_template, request, ur
 
 import auth
 import db
+import seed
 from auth import login_required
 from db import get_db
 
@@ -14,6 +15,11 @@ app.config["DATABASE"] = os.environ.get(
     "DATABASE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "campus_bites.db")
 )
 db.init_app(app)
+
+# A brand-new database gets fictitious data so the site never looks empty.
+# Set AUTO_SEED=0 to start with an empty database instead.
+if os.environ.get("AUTO_SEED", "1") != "0":
+    seed.seed_if_empty(app.config["DATABASE"])
 
 app.register_blueprint(auth.bp)
 app.before_request(auth.load_user)
