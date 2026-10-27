@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_macros.html" import stars %}
+{% block title %}{{ user.username }}{% endblock %}
+{% block content %}
+{% set is_me = g.user and g.user.id == user.id %}
+<section class="hero">
+  <h1>{{ 'Your reviews' if is_me else user.username ~ '’s reviews' }}</h1>
+  <p class="lede">
+    Member since {{ user.created_at[:10] }} ·
+    {{ reviews|length }} review{{ '' if reviews|length == 1 else 's' }}
+    {% if avg is not none %} · gives {{ '%.1f' % avg }} ★ on average{% endif %}
+  </p>
+</section>
+
+{% if reviews %}
+<ul class="reviews">
+  {% for r in reviews %}
+  <li class="card review">
+    <div class="review-head">
+      <span><strong><a href="{{ url_for('place', place_id=r.place_id) }}">{{ r.place_name }}</a></strong>
+        <span class="pill">{{ r.category }}</span></span>
+      <span>{{ stars(r.rating) }}</span>
+    </div>
+    <p class="review-body">{{ r.body }}</p>
+    <div class="small muted">
+      {{ r.updated_at[:10] }}{% if r.updated_at != r.created_at %} · edited{% endif %}
+      {% if is_me %} · <a href="{{ url_for('place', place_id=r.place_id) }}#your-review">Edit</a>{% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="card empty">
+  {% if is_me %}
+    You haven't reviewed anything yet. <a href="{{ url_for('index') }}">Pick a place</a> and tell us how it was.
+  {% else %}
+    {{ user.username }} hasn't reviewed anything yet.
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

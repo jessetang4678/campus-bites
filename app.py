@@ -138,6 +138,22 @@ def delete_review(place_id):
     return redirect(url_for("place", place_id=place_id))
 
 
+@app.route("/u/<username>")
+def user_page(username):
+    db_ = get_db()
+    user = db_.execute("SELECT id, username, created_at FROM users WHERE username = ?",
+                       (username,)).fetchone()
+    if user is None:
+        abort(404, description=f"There is no user called “{username}”.")
+    reviews = db_.execute(
+        "SELECT r.*, p.name AS place_name, p.category FROM reviews r "
+        "JOIN places p ON p.id = r.place_id WHERE r.user_id = ? "
+        "ORDER BY r.updated_at DESC, r.id DESC", (user["id"],)
+    ).fetchall()
+    avg = round(sum(r["rating"] for r in reviews) / len(reviews), 2) if reviews else None
+    return render_template("user.html", user=user, reviews=reviews, avg=avg)
+
+
 @app.route("/about")
 def about():
     return render_template("about.html")

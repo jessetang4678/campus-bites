@@ -43,7 +43,7 @@
       {% for r in reviews %}
       <li class="card review{% if mine and r.id == mine.id %} mine{% endif %}">
         <div class="review-head">
-          <strong>{{ r.username }}</strong>
+          <strong><a href="{{ url_for('user_page', username=r.username) }}">{{ r.username }}</a></strong>
           <span>{{ stars(r.rating) }}</span>
         </div>
         <p class="review-body">{{ r.body }}</p>
