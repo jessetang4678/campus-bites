@@ -75,6 +75,12 @@ GOOD = [
     "My go-to after late labs. Get the {dish}.",
     "Honestly worth the walk. The {dish} is unreal.",
     "Great value for students. {Dish} was huge.",
+    "Took my parents here on move-in weekend and they loved the {dish}.",
+    "{Dish} was fresh and hot, staff remembered my order.",
+    "I have tried everything on the menu and the {dish} still wins.",
+    "Consistently good. The {dish} never disappoints.",
+    "Ten out of ten for the {dish}, zero notes.",
+    "Perfect study-break spot. The {dish} is my reward for finishing a problem set.",
 ]
 OK = [
     "Solid. The {dish} was fine but nothing special.",
@@ -82,18 +88,28 @@ OK = [
     "Good when you're in a hurry. {Dish} hit the spot.",
     "A bit pricey, but the {dish} was tasty.",
     "Hit or miss. Today the {dish} was a hit.",
+    "{Dish} was okay. Seating is tight at noon.",
+    "Fine for a quick bite between classes; the {dish} is reliable.",
+    "Portions shrank this semester, but the {dish} is still decent.",
 ]
 BAD = [
     "The {dish} was cold and the wait was 30 minutes.",
     "Overpriced for what you get. Skip the {dish}.",
     "Not great. The {dish} tasted reheated.",
     "Wanted to like it, but the {dish} was bland.",
+    "Got the wrong order twice, and the {dish} was soggy.",
+    "The {dish} used to be good. Not anymore.",
+    "Would not go back for the {dish}.",
 ]
 
 
-def review_text(rng, rating, dish):
+def review_text(rng, rating, dish, used):
+    """Pick a template not yet used for this place, so reviews don't repeat."""
     pool = GOOD if rating >= 4 else OK if rating == 3 else BAD
-    return rng.choice(pool).format(dish=dish, Dish=dish[0].upper() + dish[1:])
+    fresh = [t for t in pool if t not in used] or pool
+    template = rng.choice(fresh)
+    used.add(template)
+    return template.format(dish=dish, Dish=dish[0].upper() + dish[1:])
 
 
 def seed(conn, rng=None):
@@ -119,6 +135,7 @@ def seed(conn, rng=None):
             "INSERT INTO places (name, category, location, price, description) "
             "VALUES (?, ?, ?, ?, ?)", (name, cat, loc, price, desc))
         place_id = cur.lastrowid
+        used = set()
         for uid in rng.sample(reviewers, rng.randint(4, 11)):
             rating = max(1, min(5, round(rng.gauss(quality, 0.9))))
             when = now - timedelta(days=rng.randint(1, 120), minutes=rng.randint(0, 1440))
@@ -126,7 +143,7 @@ def seed(conn, rng=None):
             conn.execute(
                 "INSERT INTO reviews (place_id, user_id, rating, body, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
-                (place_id, uid, rating, review_text(rng, rating, rng.choice(dishes)), stamp, stamp))
+                (place_id, uid, rating, review_text(rng, rating, rng.choice(dishes), used), stamp, stamp))
             n_reviews += 1
     conn.commit()
     return len(user_ids), len(PLACES), n_reviews

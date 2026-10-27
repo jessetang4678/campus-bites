@@ -38,9 +38,11 @@ main.wrap { padding-top: 28px; padding-bottom: 40px; min-height: 70vh; }
 .header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; flex-wrap: wrap; }
 .brand { font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 1.25rem; color: var(--ink); }
 .brand:hover { text-decoration: none; }
-.brand-mark { color: var(--accent); }
+.brand { display: inline-flex; align-items: center; gap: 8px; }
+.brand-mark { color: var(--accent); flex: none; }
 .nav { display: flex; align-items: center; gap: 4px 16px; flex-wrap: wrap; font-weight: 500; font-size: .95rem; }
 .nav a { color: var(--ink); }
+.nav a.btn { color: var(--accent-ink); padding: 7px 14px; }
 .nav .nav-user { color: var(--muted); }
 .nav form { margin: 0; }
 .linkish { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); cursor: pointer; }
