@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Add a place{% endblock %}
+{% block content %}
+<section class="card auth-card" style="max-width:560px">
+  <h1>Add a place</h1>
+  <p class="muted">Missing somewhere good (or somewhere to warn people about)? Add it here.</p>
+  <form class="form" method="post" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Name
+      <input type="text" name="name" value="{{ form.name }}" maxlength="60" required>
+    </label>
+    <label>Category
+      <input type="text" name="category" value="{{ form.category }}" maxlength="30" list="categories" required>
+      <datalist id="categories">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
+      <span class="hint">Pick an existing one or type a new one.</span>
+    </label>
+    <label>Where is it?
+      <input type="text" name="location" value="{{ form.location }}" maxlength="80" placeholder="e.g. Student Union, 1st floor" required>
+    </label>
+    <label>Price
+      <select name="price">
+        {% for v, label in [('1', '$ · cheap'), ('2', '$$ · moderate'), ('3', '$$$ · treat yourself')] %}
+          <option value="{{ v }}" {% if form.price == v %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Description <span class="hint">(optional)</span>
+      <textarea name="description" maxlength="300">{{ form.description }}</textarea>
+    </label>
+    <button class="btn" type="submit">Add place</button>
+  </form>
+</section>
+{% endblock %}

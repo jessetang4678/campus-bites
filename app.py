@@ -174,6 +174,48 @@ def delete_review(place_id):
     return redirect(url_for("place", place_id=place_id))
 
 
+@app.route("/places/new", methods=["GET", "POST"])
+@login_required
+def new_place():
+    db_ = get_db()
+    categories = [r["category"] for r in db_.execute(
+        "SELECT DISTINCT category FROM places ORDER BY category COLLATE NOCASE")]
+    form = {"name": "", "category": "", "location": "", "price": "2", "description": ""}
+    if request.method == "POST":
+        form = {k: request.form.get(k, "").strip() for k in form}
+        errors = []
+        if not 2 <= len(form["name"]) <= 60:
+            errors.append("Name must be 2–60 characters.")
+        if not 2 <= len(form["category"]) <= 30:
+            errors.append("Category must be 2–30 characters (e.g. Pizza, Coffee, Thai).")
+        if not 2 <= len(form["location"]) <= 80:
+            errors.append("Say where it is (2–80 characters), e.g. “Student Union, 1st floor”.")
+        if form["price"] not in ("1", "2", "3"):
+            errors.append("Pick a price level: $, $$ or $$$.")
+        if len(form["description"]) > 300:
+            errors.append("Keep the description under 300 characters.")
+        if not errors:
+            dup = db_.execute("SELECT id FROM places WHERE name = ?", (form["name"],)).fetchone()
+            if dup:
+                flash(f"“{form['name']}” is already listed, so here it is.", "info")
+                return redirect(url_for("place", place_id=dup["id"]))
+            # Reuse the existing spelling of a category ("pizza" -> "Pizza").
+            match = next((c for c in categories if c.casefold() == form["category"].casefold()), None)
+            cur = db_.execute(
+                "INSERT INTO places (name, category, location, price, description, created_by) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (form["name"], match or form["category"], form["location"], int(form["price"]),
+                 form["description"], g.user["id"]),
+            )
+            db_.commit()
+            flash(f"{form['name']} was added. Why not leave the first review?", "success")
+            return redirect(url_for("place", place_id=cur.lastrowid) + "#your-review")
+        for e in errors:
+            flash(e, "error")
+        return render_template("new_place.html", form=form, categories=categories), 400
+    return render_template("new_place.html", form=form, categories=categories)
+
+
 @app.route("/u/<username>")
 def user_page(username):
     db_ = get_db()

@@ -16,6 +16,7 @@
         <a href="{{ url_for('index') }}">Rankings</a>
         <a href="{{ url_for('about') }}">About</a>
         {% if g.user %}
+          <a href="{{ url_for('new_place') }}">Add a place</a>
           <a href="{{ url_for('user_page', username=g.user.username) }}">My reviews</a>
           <form method="post" action="{{ url_for('auth.logout') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
