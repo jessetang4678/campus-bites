@@ -59,13 +59,21 @@ def render_place(place_row, form=None, status=200):
         "SELECT r.*, u.username FROM reviews r JOIN users u ON u.id = r.user_id "
         "WHERE r.place_id = ? ORDER BY r.updated_at DESC, r.id DESC", (place_row["id"],)
     ).fetchall()
+    # Ratings histogram for the chart: how many 5-star, 4-star, ... reviews.
+    counts = {i: 0 for i in range(1, 6)}
+    for r in reviews:
+        counts[r["rating"]] += 1
+    top = max(counts.values()) or 1
+    histogram = [{"stars": i, "count": counts[i], "pct": round(100 * counts[i] / top)}
+                 for i in range(5, 0, -1)]
     mine = None
     if g.user:
         mine = next((r for r in reviews if r["user_id"] == g.user["id"]), None)
     if form is None:
         form = {"rating": mine["rating"] if mine else "", "body": mine["body"] if mine else ""}
     return render_template("place.html", place=place_row, stats=stats, reviews=reviews,
-                           mine=mine, form=form, max_review=MAX_REVIEW), status
+                           mine=mine, form=form, max_review=MAX_REVIEW,
+                           histogram=histogram), status
 
 
 @app.route("/place/<int:place_id>")

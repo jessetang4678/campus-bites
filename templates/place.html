@@ -22,6 +22,16 @@
       <div class="score-huge muted">–</div>
       <div class="small muted">No ratings yet. Be the first!</div>
     {% endif %}
+    <div class="chart" role="img" aria-label="Ratings breakdown:
+      {%- for h in histogram %} {{ h.stars }} stars {{ h.count }}{{ ',' if not loop.last }}{% endfor %}">
+      {% for h in histogram %}
+      <div class="chart-row">
+        <span class="chart-label">{{ h.stars }} ★</span>
+        <span class="chart-track"><span class="chart-bar" style="display:block;width:{{ h.pct }}%{% if not h.count %};min-width:0{% endif %}"></span></span>
+        <span class="chart-count">{{ h.count }}</span>
+      </div>
+      {% endfor %}
+    </div>
   </section>
 </div>
 
