@@ -1,13 +1,88 @@
 {% extends "base.html" %}
-{% from "_macros.html" import price %}
+{% from "_macros.html" import stars, price %}
 {% block title %}{{ place.name }}{% endblock %}
 {% block content %}
-<section class="card">
-  <p class="small"><a href="{{ url_for('index') }}">← All places</a></p>
-  <h1>{{ place.name }}</h1>
-  <div class="rank-meta">
-    <span class="pill">{{ place.category }}</span> {{ price(place.price) }} · {{ place.location }}
-  </div>
-  {% if place.description %}<p>{{ place.description }}</p>{% endif %}
-</section>
+<p class="small"><a href="{{ url_for('index') }}">← All places</a></p>
+
+<div class="place-head">
+  <section class="card">
+    <h1>{{ place.name }}</h1>
+    <div class="rank-meta">
+      <span class="pill">{{ place.category }}</span> {{ price(place.price) }} · {{ place.location }}
+    </div>
+    {% if place.description %}<p>{{ place.description }}</p>{% endif %}
+  </section>
+
+  <section class="card score-panel">
+    {% if stats.n_reviews %}
+      <div class="score-huge">{{ '%.1f' % stats.avg_rating }}</div>
+      <div>{{ stars(stats.avg_rating) }}</div>
+      <div class="small muted">average of {{ stats.n_reviews }} review{{ '' if stats.n_reviews == 1 else 's' }}</div>
+    {% else %}
+      <div class="score-huge muted">–</div>
+      <div class="small muted">No ratings yet. Be the first!</div>
+    {% endif %}
+  </section>
+</div>
+
+<div class="grid-2">
+  <section>
+    <h2>Reviews</h2>
+    {% if reviews %}
+    <ul class="reviews">
+      {% for r in reviews %}
+      <li class="card review{% if mine and r.id == mine.id %} mine{% endif %}">
+        <div class="review-head">
+          <strong>{{ r.username }}</strong>
+          <span>{{ stars(r.rating) }}</span>
+        </div>
+        <p class="review-body">{{ r.body }}</p>
+        <div class="small muted">{{ r.updated_at[:10] }}{% if r.updated_at != r.created_at %} · edited{% endif %}</div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      <div class="card empty">Nobody has reviewed {{ place.name }} yet.</div>
+    {% endif %}
+  </section>
+
+  <section id="your-review">
+    <h2>{{ 'Edit your review' if mine else 'Your review' }}</h2>
+    {% if g.user %}
+    <div class="card">
+      <form class="form" method="post" action="{{ url_for('save_review', place_id=place.id) }}" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <fieldset style="border:0;padding:0;margin:0">
+          <legend style="font-weight:600;font-size:.92rem;margin-bottom:4px">Rating</legend>
+          <div class="star-input">
+            {% for i in [5, 4, 3, 2, 1] %}
+              <input type="radio" id="star{{ i }}" name="rating" value="{{ i }}" {% if form.get('rating')|string == i|string %}checked{% endif %}>
+              <label for="star{{ i }}" title="{{ i }} star{{ '' if i == 1 else 's' }}">★</label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <label>Short review
+          <textarea name="body" maxlength="{{ max_review }}" placeholder="What did you get? Would you go back?">{{ form.get('body', '') }}</textarea>
+          <span class="hint">Up to {{ max_review }} characters.</span>
+        </label>
+        <div class="row">
+          <button class="btn" type="submit">{{ 'Save changes' if mine else 'Post review' }}</button>
+        </div>
+      </form>
+      {% if mine %}
+      <form method="post" action="{{ url_for('delete_review', place_id=place.id) }}" style="margin-top:12px"
+            onsubmit="return confirm('Delete your review? This cannot be undone.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-danger" type="submit">Delete my review</button>
+      </form>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="card empty">
+      <p><a href="{{ url_for('auth.login', next=request.path) }}">Log in</a> or
+         <a href="{{ url_for('auth.register') }}">sign up</a> to rate {{ place.name }}.</p>
+    </div>
+    {% endif %}
+  </section>
+</div>
 {% endblock %}

@@ -1,10 +1,11 @@
 """Campus Bites: rate the places to eat on and around campus."""
 import os
 
-from flask import Flask, abort, render_template
+from flask import Flask, abort, flash, g, redirect, render_template, request, url_for
 
 import auth
 import db
+from auth import login_required
 from db import get_db
 
 app = Flask(__name__)
@@ -35,12 +36,98 @@ def index():
     return render_template("index.html", places=places)
 
 
-@app.route("/place/<int:place_id>")
-def place(place_id):
+MAX_REVIEW = 500
+MIN_REVIEW = 3
+
+
+def get_place_or_404(place_id):
     row = get_db().execute("SELECT * FROM places WHERE id = ?", (place_id,)).fetchone()
     if row is None:
-        abort(404)
-    return render_template("place.html", place=row)
+        abort(404, description=f"There is no place with id {place_id}. "
+                               "It may have been removed, or the link is wrong.")
+    return row
+
+
+def render_place(place_row, form=None, status=200):
+    """Place page: summary, the reviews, and the current user's own review form."""
+    db_ = get_db()
+    stats = db_.execute(
+        "SELECT ROUND(AVG(rating), 2) AS avg_rating, COUNT(*) AS n_reviews "
+        "FROM reviews WHERE place_id = ?", (place_row["id"],)
+    ).fetchone()
+    reviews = db_.execute(
+        "SELECT r.*, u.username FROM reviews r JOIN users u ON u.id = r.user_id "
+        "WHERE r.place_id = ? ORDER BY r.updated_at DESC, r.id DESC", (place_row["id"],)
+    ).fetchall()
+    mine = None
+    if g.user:
+        mine = next((r for r in reviews if r["user_id"] == g.user["id"]), None)
+    if form is None:
+        form = {"rating": mine["rating"] if mine else "", "body": mine["body"] if mine else ""}
+    return render_template("place.html", place=place_row, stats=stats, reviews=reviews,
+                           mine=mine, form=form, max_review=MAX_REVIEW), status
+
+
+@app.route("/place/<int:place_id>")
+def place(place_id):
+    return render_place(get_place_or_404(place_id))
+
+
+def validate_review(form):
+    errors = []
+    try:
+        rating = int(form.get("rating", ""))
+    except ValueError:
+        rating = None
+    if rating is None or not 1 <= rating <= 5:
+        errors.append("Pick a rating from 1 to 5 stars.")
+    body = form.get("body", "").strip()
+    if len(body) < MIN_REVIEW:
+        errors.append(f"Write a short review (at least {MIN_REVIEW} characters).")
+    elif len(body) > MAX_REVIEW:
+        errors.append(f"Keep your review under {MAX_REVIEW} characters "
+                      f"(yours has {len(body)}).")
+    return rating, body, errors
+
+
+@app.route("/place/<int:place_id>/review", methods=["POST"])
+@login_required
+def save_review(place_id):
+    """Create the user's review, or update it if they already have one."""
+    place_row = get_place_or_404(place_id)
+    rating, body, errors = validate_review(request.form)
+    if errors:
+        for e in errors:
+            flash(e, "error")
+        return render_place(place_row, form=request.form, status=400)
+    db_ = get_db()
+    existing = db_.execute("SELECT id FROM reviews WHERE place_id = ? AND user_id = ?",
+                           (place_id, g.user["id"])).fetchone()
+    if existing:
+        db_.execute("UPDATE reviews SET rating = ?, body = ?, updated_at = datetime('now') "
+                    "WHERE id = ?", (rating, body, existing["id"]))
+        flash("Your review was updated.", "success")
+    else:
+        db_.execute("INSERT INTO reviews (place_id, user_id, rating, body) VALUES (?, ?, ?, ?)",
+                    (place_id, g.user["id"], rating, body))
+        flash("Thanks! Your review is posted.", "success")
+    db_.commit()
+    return redirect(url_for("place", place_id=place_id) + "#your-review")
+
+
+@app.route("/place/<int:place_id>/review/delete", methods=["POST"])
+@login_required
+def delete_review(place_id):
+    get_place_or_404(place_id)
+    db_ = get_db()
+    cur = db_.execute("DELETE FROM reviews WHERE place_id = ? AND user_id = ?",
+                      (place_id, g.user["id"]))
+    db_.commit()
+    if cur.rowcount:
+        flash("Your review was deleted.", "info")
+    else:
+        flash("You had no review to delete for this place.", "error")
+    return redirect(url_for("place", place_id=place_id))
 
 
 @app.route("/about")
