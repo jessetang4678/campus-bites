@@ -3,6 +3,7 @@ import functools
 import hmac
 import re
 import secrets
+import sqlite3
 
 from flask import (Blueprint, abort, flash, g, redirect, render_template,
                    request, session, url_for)
@@ -35,7 +36,7 @@ def login_required(view):
     def wrapped(*args, **kwargs):
         if g.user is None:
             flash("Please log in to do that.", "info")
-            return redirect(url_for("auth.login", next=request.full_path))
+            return redirect(url_for("auth.login", next=request.full_path.rstrip("?")))
         return view(*args, **kwargs)
     return wrapped
 
@@ -87,11 +88,16 @@ def register():
                 "SELECT 1 FROM users WHERE username = ?", (username,)).fetchone():
             errors.append(f"The username “{username}” is already taken.")
         if not errors:
-            cur = db.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(password)),
-            )
-            db.commit()
+            try:
+                cur = db.execute(
+                    "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                    (username, generate_password_hash(password)),
+                )
+                db.commit()
+            except sqlite3.IntegrityError:   # taken a moment ago by someone else
+                db.rollback()
+                flash(f"The username “{username}” is already taken.", "error")
+                return render_template("register.html", username=username), 400
             session.clear()
             session["user_id"] = cur.lastrowid
             flash(f"Welcome to Campus Bites, {username}!", "success")

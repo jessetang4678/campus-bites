@@ -1,5 +1,6 @@
 """Campus Bites: rate the places to eat on and around campus."""
 import os
+import sqlite3
 
 from flask import Flask, abort, flash, g, redirect, render_template, request, url_for
 
@@ -25,6 +26,43 @@ app.register_blueprint(auth.bp)
 app.before_request(auth.load_user)
 app.before_request(auth.check_csrf)
 app.jinja_env.globals["csrf_token"] = auth.csrf_token
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024     # forms here are tiny
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+# Cloud Run serves over HTTPS; set SECURE_COOKIES=0 only for plain-http testing.
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("K_SERVICE") is not None \
+    and os.environ.get("SECURE_COOKIES", "1") != "0"
+
+
+# ------------------------------------------------------------ error pages
+
+ERROR_TITLES = {
+    400: ("Something was wrong with that request", "Please check what you entered and try again."),
+    403: ("You can't do that", "That action is not allowed for your account."),
+    404: ("Page not found", "We couldn't find that page. The link may be wrong or the item was removed."),
+    405: ("That doesn't work here", "This page can't be used that way. Try going back and using the buttons on the page."),
+    413: ("That's too much text", "What you sent is too large. Please shorten it and try again."),
+    500: ("Something broke on our side", "Sorry about that. Please try again in a moment."),
+}
+
+
+def render_error(code, description=None):
+    title, default = ERROR_TITLES.get(code, ("Error", "Something went wrong."))
+    # Werkzeug's built-in descriptions are generic; prefer ours unless a view set one.
+    message = description if description and not description.startswith(
+        ("The requested URL", "The browser (or proxy)", "The method is not allowed",
+         "The data value transmitted", "The server encountered", "You don't have the permission")
+    ) else default
+    return render_template("error.html", code=code, title=title, message=message), code
+
+
+for _code in (400, 403, 404, 405, 413):
+    app.register_error_handler(_code, lambda e: render_error(e.code, e.description))
+
+
+@app.errorhandler(500)
+def server_error(_e):
+    return render_error(500)
 
 # Average rating, number of reviews; ties go to the place with more reviews,
 # places nobody has reviewed yet come last.
@@ -151,17 +189,17 @@ def save_review(place_id):
             flash(e, "error")
         return render_place(place_row, form=request.form, status=400)
     db_ = get_db()
-    existing = db_.execute("SELECT id FROM reviews WHERE place_id = ? AND user_id = ?",
-                           (place_id, g.user["id"])).fetchone()
-    if existing:
-        db_.execute("UPDATE reviews SET rating = ?, body = ?, updated_at = datetime('now') "
-                    "WHERE id = ?", (rating, body, existing["id"]))
-        flash("Your review was updated.", "success")
-    else:
-        db_.execute("INSERT INTO reviews (place_id, user_id, rating, body) VALUES (?, ?, ?, ?)",
-                    (place_id, g.user["id"], rating, body))
-        flash("Thanks! Your review is posted.", "success")
+    existed = db_.execute("SELECT 1 FROM reviews WHERE place_id = ? AND user_id = ?",
+                          (place_id, g.user["id"])).fetchone()
+    # Upsert: the UNIQUE(place_id, user_id) constraint guarantees one review per
+    # user per place even if the form is submitted twice at the same moment.
+    db_.execute(
+        "INSERT INTO reviews (place_id, user_id, rating, body) VALUES (?, ?, ?, ?) "
+        "ON CONFLICT (place_id, user_id) DO UPDATE SET rating = excluded.rating, "
+        "body = excluded.body, updated_at = datetime('now')",
+        (place_id, g.user["id"], rating, body))
     db_.commit()
+    flash("Your review was updated." if existed else "Thanks! Your review is posted.", "success")
     return redirect(url_for("place", place_id=place_id) + "#your-review")
 
 
@@ -207,13 +245,18 @@ def new_place():
                 return redirect(url_for("place", place_id=dup["id"]))
             # Reuse the existing spelling of a category ("pizza" -> "Pizza").
             match = next((c for c in categories if c.casefold() == form["category"].casefold()), None)
-            cur = db_.execute(
-                "INSERT INTO places (name, category, location, price, description, created_by) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (form["name"], match or form["category"], form["location"], int(form["price"]),
-                 form["description"], g.user["id"]),
-            )
-            db_.commit()
+            try:
+                cur = db_.execute(
+                    "INSERT INTO places (name, category, location, price, description, created_by) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (form["name"], match or form["category"], form["location"],
+                     int(form["price"]), form["description"], g.user["id"]),
+                )
+                db_.commit()
+            except sqlite3.IntegrityError:      # someone added the same name just now
+                db_.rollback()
+                flash(f"“{form['name']}” was just added by someone else.", "info")
+                return redirect(url_for("index", q=form["name"]))
             flash(f"{form['name']} was added. Why not leave the first review?", "success")
             return redirect(url_for("place", place_id=cur.lastrowid) + "#your-review")
         for e in errors:
