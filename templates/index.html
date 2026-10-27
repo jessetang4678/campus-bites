@@ -7,11 +7,26 @@
   <p class="lede">Ratings and reviews of every place to eat on and around campus, ranked by the students who eat there.</p>
 </section>
 
+<form class="toolbar" method="get" action="{{ url_for('index') }}" role="search">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search by name, food or location" aria-label="Search places">
+  <select name="category" aria-label="Category" onchange="this.form.submit()">
+    <option value="">All categories</option>
+    {% for c in categories %}<option value="{{ c }}" {% if c|lower == category|lower %}selected{% endif %}>{{ c }}</option>{% endfor %}
+  </select>
+  <select name="sort" aria-label="Sort by" onchange="this.form.submit()">
+    {% for key, label in sorts.items() %}<option value="{{ key }}" {% if key == sort %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+</form>
+{% if filtered %}
+  <p class="small muted">{{ places|length }} of {{ total }} places match.
+    <a href="{{ url_for('index') }}">Clear filters</a></p>
+{% endif %}
+
 {% if places %}
 <ol class="ranking">
   {% for p in places %}
   <li class="card rank-item">
-    <div class="rank-num">{% if p.n_reviews %}{{ loop.index }}{% else %}–{% endif %}</div>
+    <div class="rank-num">{{ rank_of.get(p.id, '–') }}</div>
     <div>
       <h3><a href="{{ url_for('place', place_id=p.id) }}">{{ p.name }}</a></h3>
       <div class="rank-meta">
@@ -32,6 +47,9 @@
   {% endfor %}
 </ol>
 {% else %}
-<div class="card empty">No places to show yet.</div>
+<div class="card empty">
+  {% if filtered %}No places match your search. <a href="{{ url_for('index') }}">Show all places</a>.
+  {% else %}No places to show yet.{% endif %}
+</div>
 {% endif %}
 {% endblock %}

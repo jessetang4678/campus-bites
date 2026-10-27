@@ -30,10 +30,46 @@ RANKING_SQL = """
 """
 
 
+SORTS = {
+    "rating": "Top rated",
+    "reviews": "Most reviewed",
+    "name": "Name A–Z",
+}
+
+
 @app.route("/")
 def index():
-    places = get_db().execute(RANKING_SQL).fetchall()
-    return render_template("index.html", places=places)
+    db_ = get_db()
+    ranked = db_.execute(RANKING_SQL).fetchall()
+    # Overall rank, so a place keeps its number even when the list is filtered.
+    rank_of = {}
+    for i, p in enumerate((p for p in ranked if p["n_reviews"]), start=1):
+        rank_of[p["id"]] = i
+
+    q = request.args.get("q", "").strip()[:100]
+    category = request.args.get("category", "").strip()
+    sort = request.args.get("sort", "rating")
+    if sort not in SORTS:
+        sort = "rating"
+
+    places = list(ranked)
+    if q:
+        needle = q.casefold()
+        places = [p for p in places if needle in
+                  f"{p['name']} {p['category']} {p['location']} {p['description']}".casefold()]
+    if category:
+        places = [p for p in places if p["category"].casefold() == category.casefold()]
+    if sort == "reviews":
+        places.sort(key=lambda p: (-p["n_reviews"], p["name"].casefold()))
+    elif sort == "name":
+        places.sort(key=lambda p: p["name"].casefold())
+
+    categories = [r["category"] for r in db_.execute(
+        "SELECT DISTINCT category FROM places ORDER BY category COLLATE NOCASE")]
+    filtered = bool(q or category)
+    return render_template("index.html", places=places, rank_of=rank_of, q=q,
+                           category=category, sort=sort, sorts=SORTS,
+                           categories=categories, filtered=filtered, total=len(ranked))
 
 
 MAX_REVIEW = 500
